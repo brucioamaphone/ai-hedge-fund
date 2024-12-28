@@ -6,7 +6,7 @@ from tools.api import search_line_items, get_financial_metrics, get_insider_trad
 
 from datetime import datetime
 
-llm = ChatOpenAI(model="gpt-4o")
+llm = ChatOpenAI(model="gpt-4o-mini")
 
 def market_data_agent(state: AgentState):
     """Responsible for gathering and preprocessing market data"""
