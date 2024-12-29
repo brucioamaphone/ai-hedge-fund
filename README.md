@@ -1,41 +1,119 @@
-# AI Hedge Fund
+# AI Crypto Hedge Fund
 
-This is a proof concept for an AI-powered hedge fund.  The goal of this project is to explore the use of AI to make trading decisions.  This project is for **educational** purposes only and is not intended for real trading or investment.
+This is a proof of concept for an AI-powered crypto hedge fund that analyzes DeFi trading data to make informed trading decisions. The system uses DexScreener API to gather real-time market data and employs a multi-agent architecture for comprehensive analysis. This project is for **educational** purposes only and is not intended for real trading or investment.
 
-This system employs several agents working together:
+## System Architecture
 
-1. Market Data Analyst - Gathers and preprocesses market data
-2. Valuation Agent - Calculates the intrinsic value of a stock and generates trading signals
-3. Sentiment Agent - Analyzes market sentiment and generates trading signals
-4. Fundamentals Agent - Analyzes fundamental data and generates trading signals
-5. Technical Analyst - Analyzes technical indicators and generates trading signals
-6. Risk Manager - Calculates risk metrics and sets position limits
-7. Portfolio Manager - Makes final trading decisions and generates orders
+The system employs seven specialized agents working together in a coordinated workflow:
 
-![Screenshot 2024-12-27 at 5 49 56 PM](https://github.com/user-attachments/assets/c281b8c3-d8e6-431e-a05e-d309d306e967)
+```mermaid
+graph TD
+    MD[Market Data Agent] --> TA[Technical Analyst]
+    MD --> FA[Fundamentals Agent]
+    MD --> SA[Sentiment Agent]
+    MD --> VA[Valuation Agent]
+    TA --> RM[Risk Manager]
+    FA --> RM
+    SA --> RM
+    VA --> RM
+    RM --> PM[Portfolio Manager]
+```
 
-Note: the system simulates trading decisions, it does not actually trade.
+### Agent Descriptions
 
-## Disclaimer
+1. **Market Data Agent**
+   ```mermaid
+   graph LR
+       A[DexScreener API] --> B[Get Pair Info]
+       B --> C[Select Most Liquid Pair]
+       C --> D[Extract Key Metrics]
+       D --> E[Generate Summary]
+   ```
+   - Fetches real-time data from DexScreener API
+   - Identifies the most liquid trading pair
+   - Extracts key metrics: price, volume, liquidity, market cap
+   - Provides standardized data format for other agents
 
-This project is for **educational and research purposes only**.
+2. **Technical Analyst**
+   ```mermaid
+   graph LR
+       A[Price Data] --> B[Momentum Analysis]
+       A --> C[Volume Analysis]
+       A --> D[Buy/Sell Pressure]
+       B & C & D --> E[Generate Signals]
+   ```
+   - Analyzes price momentum across multiple timeframes
+   - Evaluates volume patterns and trends
+   - Assesses buy/sell pressure ratios
+   - Generates technical trading signals
 
-- Not intended for real trading or investment
-- No warranties or guarantees provided
-- Past performance does not indicate future results
-- Creator assumes no liability for financial losses
-- Consult a financial advisor for investment decisions
+3. **Fundamentals Agent**
+   ```mermaid
+   graph LR
+       A[DEX Data] --> B[Liquidity Analysis]
+       A --> C[Volume Analysis]
+       A --> D[Price Movement]
+       A --> E[Transaction Analysis]
+       B & C & D & E --> F[Generate Signals]
+   ```
+   - Analyzes liquidity depth and stability
+   - Evaluates trading volume patterns
+   - Assesses price movements and volatility
+   - Analyzes transaction patterns
 
-By using this software, you agree to use it solely for learning purposes.
+4. **Sentiment Agent**
+   ```mermaid
+   graph LR
+       A[Transaction Data] --> B[Pattern Analysis]
+       A --> C[Price Impact]
+       A --> D[Volume Trends]
+       B & C & D --> E[Generate Signals]
+   ```
+   - Analyzes transaction patterns
+   - Evaluates price impact of trades
+   - Assesses volume trends
+   - Generates market sentiment signals
 
-## Table of Contents
-- [Setup](#setup)
-- [Usage](#usage)
-  - [Running the Hedge Fund](#running-the-hedge-fund)
-  - [Running the Backtester](#running-the-backtester)
-- [Project Structure](#project-structure)
-- [Contributing](#contributing)
-- [License](#license)
+5. **Valuation Agent**
+   ```mermaid
+   graph LR
+       A[Market Data] --> B[MCap/TVL Analysis]
+       A --> C[Volume/MCap Analysis]
+       A --> D[Momentum Analysis]
+       B & C & D --> E[Generate Signals]
+   ```
+   - Calculates Market Cap to TVL ratios
+   - Evaluates Volume to Market Cap metrics
+   - Assesses value based on momentum
+   - Generates valuation signals
+
+6. **Risk Manager**
+   ```mermaid
+   graph LR
+       A[Market Data] --> B[Liquidity Risk]
+       A --> C[Volatility Risk]
+       A --> D[Transaction Risk]
+       A --> E[Market Impact]
+       B & C & D & E --> F[Position Limits]
+   ```
+   - Evaluates liquidity risks
+   - Assesses volatility levels
+   - Analyzes transaction risks
+   - Calculates market impact
+   - Sets position limits
+
+7. **Portfolio Manager**
+   ```mermaid
+   graph LR
+       A[Agent Signals] --> B[Weight Signals]
+       B --> C[Risk Assessment]
+       C --> D[Position Sizing]
+       D --> E[Final Decision]
+   ```
+   - Aggregates signals from all agents
+   - Applies signal weighting system
+   - Considers risk parameters
+   - Makes final trading decisions
 
 ## Setup
 
@@ -57,11 +135,8 @@ poetry install
 
 3. Set up your environment variables:
 ```bash
-# Create .env file for your API keys
+# Create .env file
 cp .env.example .env
-
-export OPENAI_API_KEY='your-api-key-here' # Get a key from https://platform.openai.com/
-export FINANCIAL_DATASETS_API_KEY='your-api-key-here' # Get a key from https://financialdatasets.ai/
 ```
 
 ## Usage
@@ -69,44 +144,42 @@ export FINANCIAL_DATASETS_API_KEY='your-api-key-here' # Get a key from https://f
 ### Running the Hedge Fund
 
 ```bash
-poetry run python src/main.py --ticker AAPL
+poetry run python src/main.py --token-address <TOKEN_ADDRESS> --chain-id <CHAIN_ID>
 ```
 
-You can also specify a `--show-reasoning` flag to print the reasoning of each agent to the console.
-
+Example:
 ```bash
-poetry run python src/main.py --ticker AAPL --show-reasoning
-```
-You can optionally specify the start and end dates to make decisions for a specific time period.
-
-```bash
-poetry run python src/main.py --ticker AAPL --start-date 2024-01-01 --end-date 2024-03-01 
+poetry run python src/main.py --token-address 0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b --chain-id base
 ```
 
-### Running the Backtester
+You can also specify a `--show-reasoning` flag to print the reasoning of each agent to the console:
 
 ```bash
-poetry run python src/backtester.py --ticker AAPL
+poetry run python src/main.py --token-address 0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b --chain-id base --show-reasoning
 ```
 
 **Example Output:**
 ```
-Starting backtest...
-Date         Ticker Action Quantity    Price         Cash    Stock  Total Value
-----------------------------------------------------------------------
-2024-01-01   AAPL   buy       519.0   192.53        76.93    519.0    100000.00
-2024-01-02   AAPL   hold          0   185.64        76.93    519.0     96424.09
-2024-01-03   AAPL   hold          0   184.25        76.93    519.0     95702.68
-2024-01-04   AAPL   hold          0   181.91        76.93    519.0     94488.22
-2024-01-05   AAPL   hold          0   181.18        76.93    519.0     94109.35
-2024-01-08   AAPL   sell        519   185.56     96382.57      0.0     96382.57
-2024-01-09   AAPL   buy       520.0   185.14       109.77    520.0     96382.57
-```
+Market Data Summary:
+{
+  "price": "$0.2885",
+  "market_cap": "$288,478,648.00",
+  "24h_volume": "$11,247,665.99",
+  "liquidity": "$32,979,750.88",
+  "24h_change": "-12.27%",
+  "trades_24h": "Buys: 3213, Sells: 906"
+}
 
-You can optionally specify the start and end dates to backtest over a specific time period.
+Technical Analysis:
+{
+  "momentum_signal": {
+    "signal": "bullish",
+    "details": "1h: 3.59%, 6h: 1.29%, 24h: -12.27%"
+  },
+  ...
+}
 
-```bash
-poetry run python src/backtester.py --ticker AAPL --start-date 2024-01-01 --end-date 2024-03-01
+...additional agent outputs...
 ```
 
 ## Project Structure 
@@ -114,21 +187,42 @@ poetry run python src/backtester.py --ticker AAPL --start-date 2024-01-01 --end-
 ai-hedge-fund/
 ├── src/
 │   ├── agents/                   # Agent definitions and workflow
-│   │   ├── fundamentals.py       # Fundamental analysis agent
-│   │   ├── market_data.py        # Market data agent
-│   │   ├── portfolio_manager.py  # Portfolio management agent
-│   │   ├── risk_manager.py       # Risk management agent
-│   │   ├── sentiment.py          # Sentiment analysis agent
-│   │   ├── state.py              # Agent state
-│   │   ├── technicals.py         # Technical analysis agent
-│   │   ├── valuation.py          # Valuation analysis agent
+│   │   ├── fundamentals.py       # Fundamental analysis for crypto
+│   │   ├── market_data.py        # DexScreener data integration
+│   │   ├── portfolio_manager.py  # Portfolio management
+│   │   ├── risk_manager.py       # Crypto-specific risk management
+│   │   ├── sentiment.py          # DEX sentiment analysis
+│   │   ├── state.py              # Agent state management
+│   │   ├── technicals.py         # Technical analysis
+│   │   ├── valuation.py          # Crypto valuation metrics
 │   ├── tools/                    # Agent tools
-│   │   ├── api.py                # API tools
-│   ├── backtester.py             # Backtesting tools
-│   ├── main.py # Main entry point
+│   │   ├── dexscreener_api.py    # DexScreener API integration
+│   ├── main.py                   # Main entry point
 ├── pyproject.toml
 ├── ...
 ```
+
+## Features
+
+- Real-time crypto market data from DexScreener
+- Multi-timeframe analysis (1h, 6h, 24h)
+- Comprehensive risk management
+- Liquidity-aware position sizing
+- Transaction pattern analysis
+- Buy/sell pressure evaluation
+- Market impact assessment
+
+## Disclaimer
+
+This project is for **educational and research purposes only**.
+
+- Not intended for real trading or investment
+- No warranties or guarantees provided
+- Past performance does not indicate future results
+- Creator assumes no liability for financial losses
+- Consult a financial advisor for investment decisions
+
+By using this software, you agree to use it solely for learning purposes.
 
 ## Contributing
 
