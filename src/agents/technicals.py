@@ -9,199 +9,117 @@ import json
 import pandas as pd
 import numpy as np
 
-from tools.api import prices_to_df
+from tools.dexscreener_api import prices_to_df
 
 
 ##### Technical Analyst #####
 def technical_analyst_agent(state: AgentState):
     """
-    Sophisticated technical analysis system that combines multiple trading strategies:
-    1. Trend Following
-    2. Mean Reversion
-    3. Momentum
-    4. Volatility Analysis
-    5. Statistical Arbitrage Signals
+    Technical analysis system adapted for DEX trading with focus on:
+    1. Price Momentum
+    2. Volume Analysis
+    3. Buy/Sell Pressure
+    4. Liquidity Trends
     """
     show_reasoning = state["metadata"]["show_reasoning"]
     data = state["data"]
-    prices = data["prices"]
-    prices_df = prices_to_df(prices)
+    pair_info = data["pair_info"]
     
-    # Calculate indicators
-    # 1. MACD (Moving Average Convergence Divergence)
-    macd_line, signal_line = calculate_macd(prices_df)
-    
-    # 2. RSI (Relative Strength Index)
-    rsi = calculate_rsi(prices_df)
-    
-    # 3. Bollinger Bands (Bollinger Bands)
-    upper_band, lower_band = calculate_bollinger_bands(prices_df)
-    
-    # 4. OBV (On-Balance Volume)
-    obv = calculate_obv(prices_df)
-    
-    # Generate individual signals
+    # Initialize signals and reasoning
     signals = []
+    reasoning = {}
     
-    # MACD signal
-    if macd_line.iloc[-2] < signal_line.iloc[-2] and macd_line.iloc[-1] > signal_line.iloc[-1]:
-        signals.append('bullish')
-    elif macd_line.iloc[-2] > signal_line.iloc[-2] and macd_line.iloc[-1] < signal_line.iloc[-1]:
-        signals.append('bearish')
-    else:
-        signals.append('neutral')
+    # 1. Price Momentum Analysis
+    momentum_score = 0
+    price_change_24h = float(pair_info['priceChange']['h24'])
+    price_change_6h = float(pair_info['priceChange']['h6'])
+    price_change_1h = float(pair_info['priceChange']['h1'])
     
-    # RSI signal
-    if rsi.iloc[-1] < 30:
-        signals.append('bullish')
-    elif rsi.iloc[-1] > 70:
-        signals.append('bearish')
-    else:
-        signals.append('neutral')
-    
-    # Bollinger Bands signal
-    current_price = prices_df['close'].iloc[-1]
-    if current_price < lower_band.iloc[-1]:
-        signals.append('bullish')
-    elif current_price > upper_band.iloc[-1]:
-        signals.append('bearish')
-    else:
-        signals.append('neutral')
-    
-    # OBV signal
-    obv_slope = obv.diff().iloc[-5:].mean()
-    if obv_slope > 0:
-        signals.append('bullish')
-    elif obv_slope < 0:
-        signals.append('bearish')
-    else:
-        signals.append('neutral')
-    
-    # Add reasoning collection
-    reasoning = {
-        "MACD": {
-            "signal": signals[0],
-            "details": f"MACD Line crossed {'above' if signals[0] == 'bullish' else 'below' if signals[0] == 'bearish' else 'neither above nor below'} Signal Line"
-        },
-        "RSI": {
-            "signal": signals[1],
-            "details": f"RSI is {rsi.iloc[-1]:.2f} ({'oversold' if signals[1] == 'bullish' else 'overbought' if signals[1] == 'bearish' else 'neutral'})"
-        },
-        "Bollinger": {
-            "signal": signals[2],
-            "details": f"Price is {'below lower band' if signals[2] == 'bullish' else 'above upper band' if signals[2] == 'bearish' else 'within bands'}"
-        },
-        "OBV": {
-            "signal": signals[3],
-            "details": f"OBV slope is {obv_slope:.2f} ({signals[3]})"
-        }
+    # Check different timeframes for momentum
+    if price_change_1h > 0:
+        momentum_score += 1
+    if price_change_6h > 0:
+        momentum_score += 1
+    if price_change_24h > 0:
+        momentum_score += 1
+        
+    signals.append('bullish' if momentum_score >= 2 else 'bearish' if momentum_score == 0 else 'neutral')
+    reasoning["momentum_signal"] = {
+        "signal": signals[0],
+        "details": f"1h: {price_change_1h:.2f}%, 6h: {price_change_6h:.2f}%, 24h: {price_change_24h:.2f}%"
     }
     
-    # Determine overall signal
-    bullish_signals = signals.count('bullish')
-    bearish_signals = signals.count('bearish')
+    # 2. Volume Analysis
+    volume_score = 0
+    volume_1h = float(pair_info['volume']['h1'])
+    volume_6h = float(pair_info['volume']['h6'])
+    volume_24h = float(pair_info['volume']['h24'])
     
-    if bullish_signals > bearish_signals:
-        overall_signal = 'bullish'
-    elif bearish_signals > bullish_signals:
-        overall_signal = 'bearish'
+    # Check if volume is increasing
+    hourly_avg_24h = volume_24h / 24
+    hourly_avg_6h = volume_6h / 6
+    hourly_volume_1h = volume_1h
+    
+    if hourly_volume_1h > hourly_avg_6h:
+        volume_score += 1
+    if hourly_avg_6h > hourly_avg_24h:
+        volume_score += 1
+        
+    signals.append('bullish' if volume_score >= 2 else 'bearish' if volume_score == 0 else 'neutral')
+    reasoning["volume_signal"] = {
+        "signal": signals[1],
+        "details": f"1h Vol: ${volume_1h:,.2f}, 6h Avg: ${hourly_avg_6h:,.2f}, 24h Avg: ${hourly_avg_24h:,.2f}"
+    }
+    
+    # 3. Buy/Sell Pressure Analysis
+    pressure_score = 0
+    buys_1h = pair_info['txns']['h1']['buys']
+    sells_1h = pair_info['txns']['h1']['sells']
+    buys_6h = pair_info['txns']['h6']['buys']
+    sells_6h = pair_info['txns']['h6']['sells']
+    buys_24h = pair_info['txns']['h24']['buys']
+    sells_24h = pair_info['txns']['h24']['sells']
+    
+    # Calculate buy/sell ratios
+    ratio_1h = buys_1h / sells_1h if sells_1h > 0 else 1
+    ratio_6h = buys_6h / sells_6h if sells_6h > 0 else 1
+    ratio_24h = buys_24h / sells_24h if sells_24h > 0 else 1
+    
+    if ratio_1h > 1.1:  # 10% more buys than sells
+        pressure_score += 1
+    if ratio_6h > 1.1:
+        pressure_score += 1
+    if ratio_24h > 1.1:
+        pressure_score += 1
+        
+    signals.append('bullish' if pressure_score >= 2 else 'bearish' if pressure_score == 0 else 'neutral')
+    reasoning["pressure_signal"] = {
+        "signal": signals[2],
+        "details": f"1h B/S: {ratio_1h:.2f}, 6h B/S: {ratio_6h:.2f}, 24h B/S: {ratio_24h:.2f}"
+    }
+    
+    # Aggregate signals
+    bullish_count = len([s for s in signals if s == 'bullish'])
+    bearish_count = len([s for s in signals if s == 'bearish'])
+    
+    if bullish_count > len(signals) / 2:
+        final_signal = 'bullish'
+    elif bearish_count > len(signals) / 2:
+        final_signal = 'bearish'
     else:
-        overall_signal = 'neutral'
-    
-    # Calculate confidence level based on the proportion of indicators agreeing
-    total_signals = len(signals)
-    confidence = max(bullish_signals, bearish_signals) / total_signals
-    
-    # Generate the message content
-    message_content = {
-        "signal": overall_signal,
-        "confidence": f"{round(confidence * 100)}%",
-        "reasoning": {
-            "MACD": reasoning["MACD"],
-            "RSI": reasoning["RSI"],
-            "Bollinger": reasoning["Bollinger"],
-            "OBV": reasoning["OBV"]
-        }
-    }
-
-    # 1. Trend Following Strategy
-    trend_signals = calculate_trend_signals(prices_df)
-    
-    # 2. Mean Reversion Strategy
-    mean_reversion_signals = calculate_mean_reversion_signals(prices_df)
-    
-    # 3. Momentum Strategy
-    momentum_signals = calculate_momentum_signals(prices_df)
-    
-    # 4. Volatility Strategy
-    volatility_signals = calculate_volatility_signals(prices_df)
-    
-    # 5. Statistical Arbitrage Signals
-    stat_arb_signals = calculate_stat_arb_signals(prices_df)
-    
-    # Combine all signals using a weighted ensemble approach
-    strategy_weights = {
-        'trend': 0.25,
-        'mean_reversion': 0.20,
-        'momentum': 0.25,
-        'volatility': 0.15,
-        'stat_arb': 0.15
-    }
-    
-    combined_signal = weighted_signal_combination({
-        'trend': trend_signals,
-        'mean_reversion': mean_reversion_signals,
-        'momentum': momentum_signals,
-        'volatility': volatility_signals,
-        'stat_arb': stat_arb_signals
-    }, strategy_weights)
-    
-    # Generate detailed analysis report
-    analysis_report = {
-        "signal": combined_signal['signal'],
-        "confidence": f"{round(combined_signal['confidence'] * 100)}%",
-        "strategy_signals": {
-            "trend_following": {
-                "signal": trend_signals['signal'],
-                "confidence": f"{round(trend_signals['confidence'] * 100)}%",
-                "metrics": normalize_pandas(trend_signals['metrics'])
-            },
-            "mean_reversion": {
-                "signal": mean_reversion_signals['signal'],
-                "confidence": f"{round(mean_reversion_signals['confidence'] * 100)}%",
-                "metrics": normalize_pandas(mean_reversion_signals['metrics'])
-            },
-            "momentum": {
-                "signal": momentum_signals['signal'],
-                "confidence": f"{round(momentum_signals['confidence'] * 100)}%",
-                "metrics": normalize_pandas(momentum_signals['metrics'])
-            },
-            "volatility": {
-                "signal": volatility_signals['signal'],
-                "confidence": f"{round(volatility_signals['confidence'] * 100)}%",
-                "metrics": normalize_pandas(volatility_signals['metrics'])
-            },
-            "statistical_arbitrage": {
-                "signal": stat_arb_signals['signal'],
-                "confidence": f"{round(stat_arb_signals['confidence'] * 100)}%",
-                "metrics": normalize_pandas(stat_arb_signals['metrics'])
-            }
-        }
-    }
-
-    # Create the technical analyst message
-    message = HumanMessage(
-        content=json.dumps(analysis_report),
-        name="technical_analyst_agent",
-    )
-
+        final_signal = 'neutral'
+        
     if show_reasoning:
-        show_agent_reasoning(analysis_report, "Technical Analyst")
+        print("\nTechnical Analysis:")
+        print(json.dumps(reasoning, indent=2))
+        
+    # Update state
+    state["signals"] = state.get("signals", {})
+    state["reasoning"] = state.get("reasoning", {})
+    state["signals"]["technical"] = final_signal
+    state["reasoning"]["technical"] = reasoning
     
-    return {
-        "messages": [message],
-        "data": data,
-    }
+    return state
 
 def calculate_trend_signals(prices_df):
     """

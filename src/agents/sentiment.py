@@ -1,59 +1,104 @@
-
 from langchain_core.messages import HumanMessage
-
 from agents.state import AgentState, show_agent_reasoning
-
 import json
 
 ##### Sentiment Agent #####
 def sentiment_agent(state: AgentState):
-    """Analyzes market sentiment and generates trading signals."""
+    """Analyzes market sentiment and generates trading signals based on DEX trading patterns."""
     data = state["data"]
-    insider_trades = data["insider_trades"]
+    pair_info = data["pair_info"]
     show_reasoning = state["metadata"]["show_reasoning"]
 
-    # Loop through the insider trades, if transaction_shares is negative, then it is a sell, which is bearish, if positive, then it is a buy, which is bullish
+    # Initialize signals and reasoning
     signals = []
-    for trade in insider_trades:
-        transaction_shares = trade["transaction_shares"]
-        if not transaction_shares:
-            continue
-        if transaction_shares < 0:
-            signals.append("bearish")
-        else:
-            signals.append("bullish")
-
-    # Determine overall signal
-    bullish_signals = signals.count("bullish")
-    bearish_signals = signals.count("bearish")
-    if bullish_signals > bearish_signals:
-        overall_signal = "bullish"
-    elif bearish_signals > bullish_signals:
-        overall_signal = "bearish"
+    reasoning = {}
+    
+    # 1. Transaction Pattern Analysis
+    txn_score = 0
+    buys_1h = pair_info["txns"]["h1"]["buys"]
+    sells_1h = pair_info["txns"]["h1"]["sells"]
+    buys_6h = pair_info["txns"]["h6"]["buys"]
+    sells_6h = pair_info["txns"]["h6"]["sells"]
+    buys_24h = pair_info["txns"]["h24"]["buys"]
+    sells_24h = pair_info["txns"]["h24"]["sells"]
+    
+    # Calculate buy/sell ratios for different timeframes
+    ratio_1h = buys_1h / sells_1h if sells_1h > 0 else 1
+    ratio_6h = buys_6h / sells_6h if sells_6h > 0 else 1
+    ratio_24h = buys_24h / sells_24h if sells_24h > 0 else 1
+    
+    # Check if buy pressure is increasing
+    if ratio_1h > ratio_6h:
+        txn_score += 1
+    if ratio_6h > ratio_24h:
+        txn_score += 1
+        
+    signals.append('bullish' if txn_score >= 2 else 'bearish' if txn_score == 0 else 'neutral')
+    reasoning["transaction_pattern"] = {
+        "signal": signals[0],
+        "details": f"1h B/S: {ratio_1h:.2f}, 6h B/S: {ratio_6h:.2f}, 24h B/S: {ratio_24h:.2f}"
+    }
+    
+    # 2. Price Impact Analysis
+    impact_score = 0
+    price_change_1h = float(pair_info["priceChange"]["h1"])
+    price_change_6h = float(pair_info["priceChange"]["h6"])
+    price_change_24h = float(pair_info["priceChange"]["h24"])
+    
+    # Check if recent price changes are more positive
+    if price_change_1h > price_change_6h:
+        impact_score += 1
+    if price_change_6h > price_change_24h:
+        impact_score += 1
+        
+    signals.append('bullish' if impact_score >= 2 else 'bearish' if impact_score == 0 else 'neutral')
+    reasoning["price_impact"] = {
+        "signal": signals[1],
+        "details": f"1h: {price_change_1h:.2f}%, 6h: {price_change_6h:.2f}%, 24h: {price_change_24h:.2f}%"
+    }
+    
+    # 3. Volume Trend Analysis
+    volume_score = 0
+    volume_1h = float(pair_info["volume"]["h1"])
+    volume_6h = float(pair_info["volume"]["h6"])
+    volume_24h = float(pair_info["volume"]["h24"])
+    
+    # Calculate hourly averages
+    hourly_vol_1h = volume_1h
+    hourly_vol_6h = volume_6h / 6
+    hourly_vol_24h = volume_24h / 24
+    
+    # Check if recent volume is higher
+    if hourly_vol_1h > hourly_vol_6h:
+        volume_score += 1
+    if hourly_vol_6h > hourly_vol_24h:
+        volume_score += 1
+        
+    signals.append('bullish' if volume_score >= 2 else 'bearish' if volume_score == 0 else 'neutral')
+    reasoning["volume_trend"] = {
+        "signal": signals[2],
+        "details": f"1h Avg: ${hourly_vol_1h:,.2f}, 6h Avg: ${hourly_vol_6h:,.2f}, 24h Avg: ${hourly_vol_24h:,.2f}"
+    }
+    
+    # Aggregate signals
+    bullish_count = len([s for s in signals if s == 'bullish'])
+    bearish_count = len([s for s in signals if s == 'bearish'])
+    
+    if bullish_count > len(signals) / 2:
+        final_signal = 'bullish'
+    elif bearish_count > len(signals) / 2:
+        final_signal = 'bearish'
     else:
-        overall_signal = "neutral"
-
-    # Calculate confidence level based on the proportion of indicators agreeing
-    total_signals = len(signals)
-    confidence = max(bullish_signals, bearish_signals) / total_signals
-
-    message_content = {
-        "signal": overall_signal,
-        "confidence": f"{round(confidence * 100)}%",
-        "reasoning": f"Bullish signals: {bullish_signals}, Bearish signals: {bearish_signals}"
-    }
-
-    # Print the reasoning if the flag is set
+        final_signal = 'neutral'
+        
     if show_reasoning:
-        show_agent_reasoning(message_content, "Sentiment Analysis Agent")
-
-    # Create the sentiment message
-    message = HumanMessage(
-        content=json.dumps(message_content),
-        name="sentiment_agent",
-    )
-
-    return {
-        "messages": [message],
-        "data": data,
-    }
+        print("\nSentiment Analysis:")
+        print(json.dumps(reasoning, indent=2))
+        
+    # Update state
+    state["signals"] = state.get("signals", {})
+    state["reasoning"] = state.get("reasoning", {})
+    state["signals"]["sentiment"] = final_signal
+    state["reasoning"]["sentiment"] = reasoning
+    
+    return state

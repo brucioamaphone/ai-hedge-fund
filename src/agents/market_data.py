@@ -1,74 +1,55 @@
-
 from langchain_openai.chat_models import ChatOpenAI
-
-from agents.state import AgentState
-from tools.api import search_line_items, get_financial_metrics, get_insider_trades, get_market_cap, get_prices
-
+from langchain_core.messages import HumanMessage
+from agents.state import AgentState, show_agent_reasoning
+from tools.dexscreener_api import get_crypto_pair_info, get_crypto_prices, get_crypto_market_cap, get_dex_liquidity
+import json
 from datetime import datetime
 
-llm = ChatOpenAI(model="gpt-4o-mini")
-
 def market_data_agent(state: AgentState):
-    """Responsible for gathering and preprocessing market data"""
-    messages = state["messages"]
+    """Responsible for gathering and preprocessing market data for crypto assets"""
+    show_reasoning = state["metadata"]["show_reasoning"]
     data = state["data"]
 
-    # Set default dates
-    end_date = data["end_date"] or datetime.now().strftime('%Y-%m-%d')
-    if not data["start_date"]:
-        # Calculate 3 months before end_date
-        end_date_obj = datetime.strptime(end_date, '%Y-%m-%d')
-        start_date = end_date_obj.replace(month=end_date_obj.month - 3) if end_date_obj.month > 3 else \
-            end_date_obj.replace(year=end_date_obj.year - 1, month=end_date_obj.month + 9)
-        start_date = start_date.strftime('%Y-%m-%d')
-    else:
-        start_date = data["start_date"]
-
-    # Get the historical price data
-    prices = get_prices(
-        ticker=data["ticker"], 
-        start_date=start_date, 
-        end_date=end_date,
-    )
-
-    # Get the financial metrics
-    financial_metrics = get_financial_metrics(
-        ticker=data["ticker"], 
-        report_period=end_date, 
-        period='ttm', 
-        limit=1,
-    )
-
-    # Get the insider trades
-    insider_trades = get_insider_trades(
-        ticker=data["ticker"], 
-        end_date=end_date,
-        limit=5,
-    )
-
-    # Get the market cap
-    market_cap = get_market_cap(
-        ticker=data["ticker"],
-    )
-
-    # Get the line_items
-    financial_line_items = search_line_items(
-        ticker=data["ticker"], 
-        line_items=["free_cash_flow", "net_income", "depreciation_and_amortization", "capital_expenditure", "working_capital"],
-        period='ttm',
-        limit=2,
-    )
-
-    return {
-        "messages": messages,
-        "data": {
-            **data, 
-            "prices": prices, 
-            "start_date": start_date, 
-            "end_date": end_date,
-            "financial_metrics": financial_metrics,
-            "insider_trades": insider_trades,
-            "market_cap": market_cap,
-            "financial_line_items": financial_line_items,
+    # Get the token's trading data
+    token_address = data["token_address"]
+    chain_id = data.get("chain_id", "base")  # Default to Base chain if not specified
+    
+    try:
+        # Get comprehensive pair info
+        pairs = get_crypto_pair_info(token_address, chain_id)
+        
+        # Get the most liquid pair
+        most_liquid_pair = max(pairs["pairs"], key=lambda x: float(x.get("liquidity", {}).get("usd", 0)))
+        
+        # Update the state with crypto-specific market data
+        data.update({
+            "pair_info": most_liquid_pair,
+            "current_price": float(most_liquid_pair["priceUsd"]),
+            "market_cap": float(most_liquid_pair["fdv"]),  # Using fully diluted valuation
+            "volume_24h": float(most_liquid_pair["volume"]["h24"]),
+            "liquidity": float(most_liquid_pair["liquidity"]["usd"])
+        })
+        
+        # Generate market data summary
+        summary = {
+            "price": f"${data['current_price']:.4f}",
+            "market_cap": f"${data['market_cap']:,.2f}",
+            "24h_volume": f"${data['volume_24h']:,.2f}",
+            "liquidity": f"${data['liquidity']:,.2f}",
+            "24h_change": f"{float(most_liquid_pair['priceChange']['h24']):,.2f}%",
+            "trades_24h": f"Buys: {most_liquid_pair['txns']['h24']['buys']}, Sells: {most_liquid_pair['txns']['h24']['sells']}"
         }
-    }
+        
+        if show_reasoning:
+            print("\nMarket Data Summary:")
+            print(json.dumps(summary, indent=2))
+        
+        # Update state with the summary
+        state["data"] = data
+        state["market_summary"] = summary
+        
+        return state
+        
+    except Exception as e:
+        print(f"Error fetching market data: {str(e)}")
+        raise

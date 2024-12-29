@@ -21,7 +21,18 @@ from datetime import datetime
 
 
 ##### Run the Hedge Fund #####
-def run_hedge_fund(ticker: str, start_date: str, end_date: str, portfolio: dict, show_reasoning: bool = False):
+def run_hedge_fund(token_address: str, chain_id: str = None, start_date: str = None, end_date: str = None, portfolio: dict = None, show_reasoning: bool = False):
+    """
+    Run the AI Hedge Fund with multiple agents analyzing crypto markets
+    
+    Args:
+        token_address: The token's contract address
+        chain_id: Optional chain ID to filter specific blockchain
+        start_date: Optional start date for analysis
+        end_date: Optional end date for analysis
+        portfolio: Optional current portfolio state
+        show_reasoning: Whether to show agent reasoning
+    """
     final_state = app.invoke(
         {
             "messages": [
@@ -30,7 +41,8 @@ def run_hedge_fund(ticker: str, start_date: str, end_date: str, portfolio: dict,
                 )
             ],
             "data": {
-                "ticker": ticker,
+                "token_address": token_address,
+                "chain_id": chain_id,
                 "portfolio": portfolio,
                 "start_date": start_date,
                 "end_date": end_date,
@@ -72,7 +84,8 @@ app = workflow.compile()
 # Add this at the bottom of the file
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run the hedge fund trading system')
-    parser.add_argument('--ticker', type=str, required=True, help='Stock ticker symbol')
+    parser.add_argument('--token-address', type=str, required=True, help='Token contract address')
+    parser.add_argument('--chain-id', type=str, help='Chain ID to filter specific blockchain')
     parser.add_argument('--start-date', type=str, help='Start date (YYYY-MM-DD). Defaults to 3 months before end date')
     parser.add_argument('--end-date', type=str, help='End date (YYYY-MM-DD). Defaults to today')
     parser.add_argument('--show-reasoning', action='store_true', help='Show reasoning from each agent')
@@ -95,11 +108,12 @@ if __name__ == "__main__":
     # Sample portfolio - you might want to make this configurable too
     portfolio = {
         "cash": 100000.0,  # $100,000 initial cash
-        "stock": 0         # No initial stock position
+        "token": 0         # No initial token position
     }
     
     result = run_hedge_fund(
-        ticker=args.ticker,
+        token_address=args.token_address,
+        chain_id=args.chain_id,
         start_date=args.start_date,
         end_date=args.end_date,
         portfolio=portfolio,
