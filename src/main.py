@@ -1,5 +1,6 @@
 from dotenv import load_dotenv
 import os
+import json
 
 # Load environment variables from .env file
 load_dotenv()
@@ -15,6 +16,7 @@ from agents.risk_manager import risk_management_agent
 from agents.sentiment import sentiment_agent
 from agents.state import AgentState
 from agents.valuation import valuation_agent
+from tools.influx_writer import InfluxWriter
 
 import argparse
 from datetime import datetime
@@ -52,7 +54,35 @@ def run_hedge_fund(token_address: str, chain_id: str = None, start_date: str = N
             }
         },
     )
-    return final_state["messages"][-1].content
+    
+    # Get the final result
+    result = final_state["messages"][-1].content
+    
+    try:
+        # Parse the result string into a dictionary
+        result_data = json.loads(result)
+        
+        # Initialize InfluxDB writer
+        writer = InfluxWriter()
+        
+        # Write data to InfluxDB
+        if "market_data" in result_data:
+            writer.write_market_data(token_address, chain_id, result_data["market_data"])
+        if "valuation_analysis" in result_data:
+            writer.write_valuation_metrics(token_address, chain_id, result_data["valuation_analysis"])
+        if "risk_analysis" in result_data:
+            writer.write_risk_metrics(token_address, chain_id, result_data["risk_analysis"])
+        if "portfolio_decision" in result_data:
+            writer.write_trading_decision(token_address, chain_id, result_data["portfolio_decision"])
+            
+        writer.close()
+        
+    except json.JSONDecodeError:
+        print("Warning: Could not parse result as JSON for InfluxDB storage")
+    except Exception as e:
+        print(f"Warning: Failed to write to InfluxDB: {str(e)}")
+    
+    return result
 
 # Define the new workflow
 workflow = StateGraph(AgentState)

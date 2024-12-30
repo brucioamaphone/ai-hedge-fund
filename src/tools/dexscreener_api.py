@@ -29,7 +29,12 @@ def get_crypto_pair_info(
     Returns:
         Dictionary containing all pairs data
     """
-    url = f"{BASE_URL}/tokens/{token_address}"
+    # Format URL based on chain
+    if chain_id:
+        url = f"{BASE_URL}/tokens/{chain_id}/{token_address}"
+    else:
+        url = f"{BASE_URL}/tokens/{token_address}"
+    
     print(f"Fetching data from: {url}")  # Debug print
     
     response = requests.get(url)

@@ -11,7 +11,7 @@ def market_data_agent(state: AgentState):
     data = state["data"]
 
     # Get the token's trading data
-    token_address = data["token_address"]
+    token_address = data["token_address"]  # Keep original case
     chain_id = data.get("chain_id", "base")  # Default to Base chain if not specified
     
     try:
@@ -31,7 +31,14 @@ def market_data_agent(state: AgentState):
         })
         
         # Generate market data summary
+        creation_date = most_liquid_pair["pairCreatedAt"]
+        if isinstance(creation_date, str):
+            creation_date = int(datetime.strptime(creation_date, "%Y-%m-%dT%H:%M:%S.%fZ").timestamp() * 1000)
+        
         summary = {
+            "symbol": most_liquid_pair["baseToken"]["symbol"],
+            "name": most_liquid_pair["baseToken"]["name"],
+            "creation_date": creation_date,
             "price": f"${data['current_price']:.4f}",
             "market_cap": f"${data['market_cap']:,.2f}",
             "24h_volume": f"${data['volume_24h']:,.2f}",
@@ -43,10 +50,12 @@ def market_data_agent(state: AgentState):
         if show_reasoning:
             print("\nMarket Data Summary:")
             print(json.dumps(summary, indent=2))
+            print("\nRaw pair data:")
+            print(json.dumps(most_liquid_pair, indent=2))
         
         # Update state with the summary
         state["data"] = data
-        state["market_summary"] = summary
+        state["data"]["market_summary"] = summary
         
         return state
         

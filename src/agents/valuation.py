@@ -85,4 +85,13 @@ def valuation_agent(state: AgentState):
     state["signals"]["valuation"] = final_signal
     state["reasoning"]["valuation"] = reasoning
     
+    # Store valuation analysis for InfluxDB
+    state["data"]["valuation_analysis"] = {
+        "symbol": pair_info["baseToken"]["symbol"],
+        "name": pair_info["baseToken"]["name"],
+        "mcap_tvl_analysis": reasoning["mcap_tvl_analysis"],
+        "volume_mcap_analysis": reasoning["volume_mcap_analysis"],
+        "momentum_value_analysis": reasoning["momentum_value_analysis"]
+    }
+    
     return state

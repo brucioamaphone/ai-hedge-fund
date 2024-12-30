@@ -117,4 +117,15 @@ def portfolio_management_agent(state: AgentState):
     # Update state
     state["decision"] = decision
     
+    # Format the final response as JSON with all required data
+    response = {
+        "market_data": state["data"]["market_summary"],
+        "valuation_analysis": state["data"].get("valuation_analysis", {}),
+        "risk_analysis": state["data"].get("risk_analysis", {}),
+        "portfolio_decision": decision["reasoning"]
+    }
+    
+    # Update the last message with the JSON response
+    state["messages"][-1].content = json.dumps(response)
+    
     return state

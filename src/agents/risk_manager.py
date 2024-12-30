@@ -114,6 +114,18 @@ def risk_management_agent(state: AgentState):
     state["reasoning"] = state.get("reasoning", {})
     state["signals"]["risk"] = risk_signal
     state["reasoning"]["risk"] = reasoning
+    
+    # Store risk analysis for InfluxDB
+    state["data"]["risk_analysis"] = {
+        "symbol": pair_info["baseToken"]["symbol"],
+        "name": pair_info["baseToken"]["name"],
+        "liquidity_risk": reasoning["liquidity_risk"]["signal"],
+        "volatility_risk": reasoning["volatility_risk"]["signal"],
+        "transaction_risk": reasoning["transaction_risk"]["signal"],
+        "market_impact_risk": reasoning["market_impact_risk"]["signal"],
+        "max_position": max_position
+    }
+    
     state["position_limits"] = {
         "max_position": max_position,
         "risk_level": risk_signal
