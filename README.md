@@ -1,6 +1,6 @@
 # AI Crypto Hedge Fund
 
-This is a proof of concept for an AI-powered crypto hedge fund that analyzes DeFi trading data to make informed trading decisions. The system uses DexScreener API to gather real-time market data and employs a multi-agent architecture for comprehensive analysis. This project is for **educational** purposes only and is not intended for real trading or investment.
+This is a proof of concept for an AI-Created crypto hedge fund that analyzes DeFi trading data to make informed trading decisions. The system uses DexScreener API to gather real-time market data and employs a multi-'agent' architecture for comprehensive analysis. The app began using the OpenAi LLM for each agent's analysis. I used Windsurf to adapt this program to use DexScreener, and prompted it to change the agent's logic to better fit crypto assets. Instead of off loading logic to an LLM, Windurf decided to define its own logic in place. The reasoning it gave was that it would be more predictable and therefore more useful to track over time. This project is for **educational** purposes only and is not intended for real trading or investment.
 
 ## System Architecture
 
