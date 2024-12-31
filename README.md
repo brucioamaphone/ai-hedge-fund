@@ -180,7 +180,16 @@ Technical Analysis:
 }
 
 ...additional agent outputs...
-```
+
+### Updates as of 2025-01-01
+- The system now integrates with the DexScreener API for real-time market data, providing insights into liquidity, trading volume, and price metrics.
+- New agents have been added to enhance trading decision-making:
+  - **Market Data Agent**: Fetches real-time data and identifies the most liquid trading pairs.
+  - **Technical Analyst**: Analyzes price momentum and volume patterns to generate trading signals.
+  - **Fundamentals Agent**: Evaluates liquidity, volume, and price movements to inform trading strategies.
+  - **Risk Manager**: Assesses trading risks and sets position limits based on liquidity and volume analysis.
+  - **Valuation Agent**: Performs valuation analysis using market cap and liquidity metrics.
+- Example integration with InfluxDB for data storage and analysis has been demonstrated in `influx_example.py`.
 
 ## Project Structure 
 ```
